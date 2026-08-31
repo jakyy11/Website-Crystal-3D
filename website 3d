@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CrystalSim 3D — Interactive Bravais Lattice Simulation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   CRYSTALSIM 3D — DESIGN TOKENS
+   Palette: instrument-panel dark (graphite/void) + amber LCD
+   readout accent + cool teal data accent.
+   Display: Space Grotesk / Body: Inter / Data: JetBrains Mono
+========================================================= */
+:root{
+  --void:#0a0e13;
+  --panel:#11161d;
+  --panel-alt:#161d26;
+  --panel-raised:#1b232e;
+  --border:#26313e;
+  --border-soft:#1c2530;
+  --text-1:#e9eef3;
+  --text-2:#9fb0bf;
+  --text-3:#6b7c8c;
+  --amber:#ffb454;
+  --amber-dim:#8a5c22;
+  --teal:#5ecbd8;
+  --teal-dim:#2a5a61;
+  --red:#ff6b6b;
+  --green:#7ee0a8;
+  --violet:#c7a3ff;
+  --corner-color:#5ecbd8;
+  --face-color:#ffb454;
+  --body-color:#ff8fb1;
+  --base-color:#c7a3ff;
+  --font-display:'Space Grotesk',sans-serif;
+  --font-body:'Inter',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --radius:6px;
+  --header-h:88px;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--void);
+  color:var(--text-1);
+  font-family:var(--font-body);
+  overflow:hidden;
+}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:var(--panel);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3);}
+
+button{font-family:var(--font-body);cursor:pointer;}
+input[type=number]{font-family:var(--font-mono);}
+select{font-family:var(--font-body);}
+
+/* ---------- App shell ---------- */
+#app{display:flex;flex-direction:column;height:100vh;width:100vw;}
+
+/* ---------- Header ---------- */
+#header{
+  height:var(--header-h);
+  min-height:var(--header-h);
+  display:flex;align-items:center;
+  justify-content:space-between;
+  padding:0 18px;
+  background:linear-gradient(180deg,var(--panel-raised),var(--panel));
+  border-bottom:1px solid var(--border);
+  gap:16px;
+  position:relative;
+  z-index:50;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:42px;height:42px;border:1px solid var(--teal-dim);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;position:relative;
+  background:radial-gradient(circle at 30% 30%,#1a2733,#0d1319);
+  flex:none;
+}
+.brand-mark svg{width:26px;height:26px;}
+.brand-text h1{
+  font-family:var(--font-display);
+  font-size:19px;font-weight:700;letter-spacing:0.5px;margin:0;
+  color:var(--text-1);
+}
+.brand-text h1 span{color:var(--amber);}
+.brand-text p{margin:1px 0 0;font-size:11px;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-mono);}
+.dev-info{
+  display:flex;flex-direction:column;align-items:flex-end;
+  font-family:var(--font-mono);font-size:10.5px;line-height:1.55;color:var(--text-3);
+  border-right:1px solid var(--border-soft);padding-right:16px;margin-right:2px;
+}
+.dev-info b{color:var(--teal);font-weight:600;}
+.header-actions{display:flex;gap:8px;align-items:center;flex:none;}
+.btn{
+  background:var(--panel-alt);border:1px solid var(--border);color:var(--text-1);
+  padding:8px 12px;border-radius:var(--radius);font-size:12.5px;font-weight:500;
+  display:flex;align-items:center;gap:6px;transition:.15s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--teal-dim);color:var(--teal);background:var(--panel-raised);}
+.btn.amber:hover{border-color:var(--amber-dim);color:var(--amber);}
+.btn.primary{background:var(--amber);color:#1a1206;border-color:var(--amber);font-weight:600;}
+.btn.primary:hover{background:#ffc478;color:#1a1206;}
+.btn.small{padding:5px 9px;font-size:11px;}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.icon-btn{width:34px;height:34px;padding:0;justify-content:center;display:none;}
+
+/* ---------- Layout ---------- */
+#main-layout{
+  flex:1;display:grid;
+  grid-template-columns:296px 1fr 320px;
+  min-height:0;
+}
+.panel-col{
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  overflow-y:auto;overflow-x:hidden;
+  padding:14px 14px 40px;
+  display:flex;flex-direction:column;gap:14px;
+}
+#info-panel{border-right:none;border-left:1px solid var(--border);}
+
+.section{
+  background:var(--panel-alt);
+  border:1px solid var(--border-soft);
+  border-radius:8px;
+  padding:12px 13px 14px;
+}
+.section-title{
+  font-family:var(--font-display);
+  font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+  color:var(--teal);margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;
+}
+.section-title small{color:var(--text-3);font-family:var(--font-mono);font-weight:400;letter-spacing:0;font-size:10px;text-transform:none;}
+
+label.field-label{
+  display:block;font-size:11px;color:var(--text-2);margin-bottom:5px;
+  font-family:var(--font-mono);letter-spacing:.3px;
+}
+select.control-select{
+  width:100%;background:var(--panel-raised);color:var(--text-1);
+  border:1px solid var(--border);border-radius:5px;padding:9px 10px;font-size:13px;
+  outline:none;margin-bottom:10px;
+}
+select.control-select:focus{border-color:var(--teal);}
+
+/* slider rows */
+.slider-row{margin-bottom:12px;}
+.slider-row:last-child{margin-bottom:2px;}
+.slider-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+.slider-head .name{font-size:12.5px;color:var(--text-2);font-family:var(--font-mono);}
+.slider-head .val{font-size:13px;color:var(--amber);font-family:var(--font-mono);font-weight:600;min-width:60px;text-align:right;}
+.slider-row.locked .slider-head .name{color:var(--text-3);}
+.slider-row.locked .slider-head .val{color:var(--text-3);}
+input[type=range]{
+  width:100%;height:4px;border-radius:2px;background:var(--border);
+  -webkit-appearance:none;appearance:none;outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:var(--teal);border:2px solid #0a0e13;cursor:pointer;
+  box-shadow:0 0 0 2px var(--teal-dim);
+}
+input[type=range]:disabled{opacity:.3;cursor:not-allowed;}
+input[type=range]:disabled::-webkit-slider-thumb{background:var(--text-3);box-shadow:none;}
+input[type=range].angle::-webkit-slider-thumb{background:var(--amber);box-shadow:0 0 0 2px var(--amber-dim);}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--teal);border:2px solid #0a0e13;}
+
+.hint{font-size:10.5px;color:var(--text-3);margin-top:8px;line-height:1.5;font-family:var(--font-mono);}
+
+/* checkbox list */
+.chk-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:var(--text-2);}
+.chk-row input{accent-color:var(--teal);width:14px;height:14px;}
+.chk-row label{cursor:pointer;user-select:none;flex:1;}
+
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.btn-grid.three{grid-template-columns:1fr 1fr 1fr;}
+.btn-grid .btn{justify-content:center;width:100%;}
+
+/* readout / data displays (signature element) */
+.readout{
+  background:#05070a;
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:10px 12px;
+  font-family:var(--font-mono);
+  position:relative;
+  overflow:hidden;
+}
+.readout::before{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(180deg,rgba(255,255,255,.015) 0px,rgba(255,255,255,.015) 1px,transparent 1px,transparent 3px);
+  pointer-events:none;
+}
+.readout-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:12px;border-bottom:1px dashed var(--border-soft);}
+.readout-row:last-child{border-bottom:none;}
+.readout-row .k{color:var(--text-3);letter-spacing:.4px;}
+.readout-row .v{color:var(--amber);font-weight:600;text-shadow:0 0 8px rgba(255,180,84,.35);}
+.readout-row .v.teal{color:var(--teal);text-shadow:0 0 8px rgba(94,203,216,.35);}
+
+.calc-toggle{
+  width:100%;background:none;border:1px dashed var(--border);color:var(--teal);
+  padding:8px 10px;border-radius:5px;font-size:12px;font-family:var(--font-mono);
+  margin-top:10px;text-align:left;
+}
+.calc-steps{
+  display:none;margin-top:8px;background:#05070a;border:1px solid var(--border-soft);
+  border-radius:5px;padding:10px 12px;font-family:var(--font-mono);font-size:12px;color:var(--text-2);line-height:1.9;
+}
+.calc-steps.open{display:block;}
+.calc-steps .eq{color:var(--green);}
+
+.legend-tag{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-2);padding:3px 0;}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex:none;}
+
+/* ---------- Viewport ---------- */
+#viewport-container{
+  position:relative;background:radial-gradient(ellipse at center, #0e141c 0%, #060a0e 100%);
+  overflow:hidden;
+}
+#canvas3d{position:absolute;inset:0;}
+#canvas3d canvas{display:block;}
+
+.reticle{position:absolute;pointer-events:none;width:28px;height:28px;opacity:.55;z-index:5;}
+.reticle svg{width:100%;height:100%;}
+.reticle.tl{top:12px;left:12px;}
+.reticle.tr{top:12px;right:12px;transform:scaleX(-1);}
+.reticle.bl{bottom:12px;left:12px;transform:scaleY(-1);}
+.reticle.br{bottom:12px;right:12px;transform:scale(-1,-1);}
+
+.viewport-overlay-top{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  text-align:center;z-index:6;pointer-events:none;
+}
+.viewport-overlay-top .sys-name{font-family:var(--font-display);font-size:20px;font-weight:700;color:var(--text-1);letter-spacing:.5px;text-shadow:0 2px 12px rgba(0,0,0,.8);}
+.viewport-overlay-top .lat-name{font-family:var(--font-mono);font-size:11.5px;color:var(--teal);letter-spacing:1px;margin-top:2px;text-shadow:0 2px 8px rgba(0,0,0,.8);}
+
+.view-controls{
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  display:flex;gap:6px;background:rgba(17,22,29,.85);backdrop-filter:blur(6px);
+  border:1px solid var(--border);border-radius:8px;padding:6px;z-index:6;
+}
+.view-controls .btn{padding:6px 10px;font-size:11px;}
+
+.explode-bar{
+  position:absolute;top:14px;right:16px;z-index:6;
+  background:rgba(17,22,29,.85);backdrop-filter:blur(6px);
+  border:1px solid var(--border);border-radius:8px;padding:9px 12px;width:190px;
+}
+.explode-bar label{font-size:10.5px;color:var(--text-2);font-family:var(--font-mono);display:flex;justify-content:space-between;margin-bottom:5px;}
+.explode-bar label span{color:var(--amber);}
+
+.legend-box{
+  position:absolute;bottom:16px;left:16px;z-index:6;
+  background:rgba(17,22,29,.85);backdrop-filter:blur(6px);
+  border:1px solid var(--border);border-radius:8px;padding:10px 13px;
+  min-width:150px;
+}
+.legend-box .lt{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-family:var(--font-mono);}
+
+.css2d-label{
+  font-family:var(--font-mono);font-size:10px;color:var(--text-1);
+  background:rgba(10,14,19,.75);padding:1px 5px;border-radius:3px;
+  border:1px solid var(--border-soft);white-space:nowrap;pointer-events:none;
+}
+.css2d-label.axis{color:var(--amber);border-color:var(--amber-dim);font-weight:600;}
+.css2d-label.vec{color:var(--teal);border-color:var(--teal-dim);font-weight:600;}
+
+/* ---------- Modals ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(4,6,9,.72);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;z-index:200;padding:20px;
+}
+.modal-backdrop.open{display:flex;}
+.modal{
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  max-width:820px;width:100%;max-height:88vh;overflow-y:auto;
+  box-shadow:0 30px 80px rgba(0,0,0,.6);
+}
+.modal-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;
+  background:var(--panel);z-index:2;
+}
+.modal-head h2{font-family:var(--font-display);font-size:17px;margin:0;color:var(--text-1);}
+.modal-body{padding:20px;}
+.modal-close{background:none;border:1px solid var(--border);color:var(--text-2);width:30px;height:30px;border-radius:6px;font-size:16px;line-height:1;}
+.modal-close:hover{color:var(--red);border-color:var(--red);}
+
+/* about modal */
+.about-dev{background:var(--panel-alt);border:1px solid var(--border-soft);border-radius:8px;padding:16px;margin-top:14px;font-family:var(--font-mono);font-size:13px;line-height:2;}
+.about-dev b{color:var(--teal);}
+
+/* compare */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+.compare-pick{display:flex;flex-direction:column;gap:8px;}
+.compare-canvas-wrap{height:260px;background:#05070a;border:1px solid var(--border-soft);border-radius:8px;position:relative;overflow:hidden;}
+.compare-canvas-wrap canvas{width:100%!important;height:100%!important;}
+table.cmp-table{width:100%;border-collapse:collapse;margin-top:16px;font-family:var(--font-mono);font-size:12.5px;}
+table.cmp-table th, table.cmp-table td{border:1px solid var(--border-soft);padding:8px 10px;text-align:center;}
+table.cmp-table th{background:var(--panel-alt);color:var(--teal);font-weight:600;}
+table.cmp-table td.label{text-align:left;color:var(--text-2);background:var(--panel-alt);}
+
+/* custom crystal */
+.custom-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px;}
+.custom-grid .field{display:flex;flex-direction:column;gap:4px;}
+.custom-grid input[type=number]{
+  background:var(--panel-raised);border:1px solid var(--border);color:var(--text-1);
+  padding:8px 9px;border-radius:5px;font-size:13px;width:100%;
+}
+.result-banner{margin-top:16px;padding:12px 14px;border-radius:8px;font-family:var(--font-mono);font-size:13px;display:none;}
+.result-banner.ok{display:block;background:rgba(126,224,168,.08);border:1px solid var(--green);color:var(--green);}
+.result-banner.warn{display:block;background:rgba(255,107,107,.08);border:1px solid var(--red);color:var(--red);}
+
+/* quiz */
+.quiz-score{font-family:var(--font-mono);font-size:13px;color:var(--amber);margin-bottom:10px;}
+.quiz-q{font-size:15px;line-height:1.6;margin-bottom:14px;font-family:var(--font-body);}
+.quiz-q pre{background:#05070a;border:1px solid var(--border-soft);padding:10px;border-radius:6px;font-family:var(--font-mono);font-size:12.5px;color:var(--teal);}
+.quiz-opts{display:flex;flex-direction:column;gap:8px;}
+.quiz-opt{
+  text-align:left;background:var(--panel-alt);border:1px solid var(--border);color:var(--text-1);
+  padding:10px 13px;border-radius:7px;font-size:13.5px;
+}
+.quiz-opt:hover{border-color:var(--teal);}
+.quiz-opt.correct{border-color:var(--green);background:rgba(126,224,168,.1);color:var(--green);}
+.quiz-opt.wrong{border-color:var(--red);background:rgba(255,107,107,.1);color:var(--red);}
+.quiz-opt:disabled{cursor:default;}
+.quiz-explain{margin-top:12px;padding:12px;background:var(--panel-alt);border-radius:7px;border:1px solid var(--border-soft);font-size:13px;color:var(--text-2);display:none;}
+.quiz-explain.show{display:block;}
+
+/* toast */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--panel-raised);border:1px solid var(--teal-dim);color:var(--text-1);
+  padding:10px 18px;border-radius:8px;font-size:13px;font-family:var(--font-mono);
+  z-index:400;opacity:0;transition:.25s;pointer-events:none;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* theory panel */
+.theory-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px dashed var(--border-soft);}
+.theory-row .k{color:var(--text-3);}
+.theory-row .v{color:var(--text-1);font-family:var(--font-mono);}
+.theory-desc{margin-top:8px;font-size:12px;color:var(--text-2);line-height:1.6;}
+.bravais-chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.bravais-chip{background:var(--panel-raised);border:1px solid var(--border);color:var(--teal);padding:3px 8px;border-radius:20px;font-size:11px;font-family:var(--font-mono);}
+
+/* ---------- Mobile / Responsive ---------- */
+.mobile-only{display:none;}
+@media (max-width: 1100px){
+  #main-layout{grid-template-columns:1fr;}
+  .panel-col{
+    position:fixed;top:var(--header-h);bottom:0;width:min(320px,86vw);
+    z-index:100;transition:transform .25s ease;box-shadow:0 0 40px rgba(0,0,0,.5);
+  }
+  #sidebar{left:0;transform:translateX(-105%);}
+  #sidebar.open{transform:translateX(0);}
+  #info-panel{right:0;transform:translateX(105%);border-left:1px solid var(--border);}
+  #info-panel.open{transform:translateX(0);}
+  .icon-btn{display:flex;}
+  .dev-info{display:none;}
+  .brand-text p{display:none;}
+  #viewport-container{grid-column:1/2;}
+}
+@media (max-width: 640px){
+  .brand-text h1{font-size:15px;}
+  #header{padding:0 10px;gap:8px;}
+  .btn span.lbl{display:none;}
+  .view-controls{max-width:94vw;overflow-x:auto;}
+  .compare-grid{grid-template-columns:1fr;}
+  .custom-grid{grid-template-columns:1fr 1fr;}
+  .explode-bar{width:150px;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== HEADER ===================== -->
+  <header id="header">
+    <div style="display:flex;align-items:center;gap:14px;min-width:0;">
+      <button class="btn icon-btn mobile-only" id="btnSidebarToggle" title="Kontrol">☰</button>
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 40 40" fill="none"><path d="M20 4 L34 12 V28 L20 36 L6 28 V12 Z" stroke="#5ecbd8" stroke-width="1.6"/><path d="M20 4 V20 M20 20 L34 12 M20 20 L6 12 M20 20 V36" stroke="#ffb454" stroke-width="1.2"/><circle cx="20" cy="4" r="2.2" fill="#5ecbd8"/><circle cx="34" cy="12" r="2.2" fill="#5ecbd8"/><circle cx="6" cy="12" r="2.2" fill="#5ecbd8"/><circle cx="20" cy="20" r="2.4" fill="#ffb454"/><circle cx="34" cy="28" r="2.2" fill="#5ecbd8"/><circle cx="6" cy="28" r="2.2" fill="#5ecbd8"/><circle cx="20" cy="36" r="2.2" fill="#5ecbd8"/></svg>
+        </div>
+        <div class="brand-text">
+          <h1>CRYSTAL<span>SIM</span> 3D</h1>
+          <p>Interactive Bravais Lattice Simulation</p>
+        </div>
+      </div>
+    </div>
+    <div class="dev-info">
+      <div>Developed by <b>Ainuzzaim Azzaki</b></div>
+      <div>NIM: <b>240321601033</b></div>
+      <div>Program Studi Pendidikan Fisika</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" id="btnReset" title="Reset simulasi"><span>⟲</span><span class="lbl">Reset</span></button>
+      <button class="btn" id="btnFullscreen" title="Fullscreen"><span>⛶</span><span class="lbl">Fullscreen</span></button>
+      <button class="btn" id="btnHelp" title="Tentang aplikasi"><span>ℹ</span><span class="lbl">About</span></button>
+      <button class="btn icon-btn mobile-only" id="btnInfoToggle" title="Info & Perhitungan">📊</button>
+    </div>
+  </header>
+
+  <!-- ===================== MAIN LAYOUT ===================== -->
+  <div id="main-layout">
+
+    <!-- ---------- SIDEBAR: CONTROLS ---------- -->
+    <aside class="panel-col" id="sidebar">
+
+      <div class="section">
+        <div class="section-title">1 · Sistem Kristal</div>
+        <label class="field-label">Pilih sistem kristal</label>
+        <select id="selSystem" class="control-select"></select>
+        <label class="field-label">Jenis Kisi Bravais</label>
+        <select id="selLattice" class="control-select"></select>
+      </div>
+
+      <div class="section">
+        <div class="section-title">2 · Parameter Panjang Kisi</div>
+        <div class="slider-row" id="row-a">
+          <div class="slider-head"><span class="name">a (Å)</span><span class="val" id="val-a">3.00 Å</span></div>
+          <input type="range" id="slider-a" min="2" max="8" step="0.05" value="3">
+        </div>
+        <div class="slider-row" id="row-b">
+          <div class="slider-head"><span class="name">b (Å)</span><span class="val" id="val-b">3.00 Å</span></div>
+          <input type="range" id="slider-b" min="2" max="8" step="0.05" value="3">
+        </div>
+        <div class="slider-row" id="row-c">
+          <div class="slider-head"><span class="name">c (Å)</span><span class="val" id="val-c">3.00 Å</span></div>
+          <input type="range" id="slider-c" min="2" max="8" step="0.05" value="3">
+        </div>
+        <div class="hint">Parameter yang dikunci sistem mengikuti otomatis (contoh: kubik → a=b=c).</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">3 · Parameter Sudut Kisi</div>
+        <div class="slider-row" id="row-alpha">
+          <div class="slider-head"><span class="name">α (°)</span><span class="val" id="val-alpha">90.0°</span></div>
+          <input type="range" class="angle" id="slider-alpha" min="60" max="120" step="0.5" value="90">
+        </div>
+        <div class="slider-row" id="row-beta">
+          <div class="slider-head"><span class="name">β (°)</span><span class="val" id="val-beta">90.0°</span></div>
+          <input type="range" class="angle" id="slider-beta" min="60" max="120" step="0.5" value="90">
+        </div>
+        <div class="slider-row" id="row-gamma">
+          <div class="slider-head"><span class="name">γ (°)</span><span class="val" id="val-gamma">90.0°</span></div>
+          <input type="range" class="angle" id="slider-gamma" min="60" max="150" step="0.5" value="90">
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">4 · Tampilan Struktur</div>
+        <label class="field-label">Mode Render</label>
+        <select id="selDisplayMode" class="control-select">
+          <option value="ballstick">Ball &amp; Stick</option>
+          <option value="spacefill">Space Filling</option>
+          <option value="wireframe">Wireframe</option>
+          <option value="points">Lattice Points</option>
+          <option value="cellonly">Unit Cell Only</option>
+        </select>
+        <div class="chk-row"><input type="checkbox" id="chkAxes" checked><label for="chkAxes">Tampilkan sumbu X Y Z</label></div>
+        <div class="chk-row"><input type="checkbox" id="chkVectors" checked><label for="chkVectors">Tampilkan vektor a b c</label></div>
+        <div class="chk-row"><input type="checkbox" id="chkAtomLabels"><label for="chkAtomLabels">Tampilkan label atom</label></div>
+        <div class="chk-row"><input type="checkbox" id="chkCell" checked><label for="chkCell">Tampilkan unit cell</label></div>
+        <div class="chk-row"><input type="checkbox" id="chkBonds" checked><label for="chkBonds">Tampilkan ikatan/batang</label></div>
+        <div class="chk-row"><input type="checkbox" id="chkCoords"><label for="chkCoords">Tampilkan koordinat fraksional</label></div>
+        <div class="chk-row"><input type="checkbox" id="chkPlane"><label for="chkPlane">Tampilkan plane Miller (hkl)</label></div>
+      </div>
+
+      <div class="section" id="millerSection" style="display:none;">
+        <div class="section-title">4b · Miller Indices (hkl) <small>advanced</small></div>
+        <div class="custom-grid" style="grid-template-columns:1fr 1fr 1fr;">
+          <div class="field"><label class="field-label">h</label><input type="number" id="millerH" value="1" step="1"></div>
+          <div class="field"><label class="field-label">k</label><input type="number" id="millerK" value="1" step="1"></div>
+          <div class="field"><label class="field-label">l</label><input type="number" id="millerL" value="1" step="1"></div>
+        </div>
+        <button class="btn primary" style="width:100%;margin-top:10px;justify-content:center;" id="btnShowPlane">Show Plane (hkl)</button>
+        <div class="hint" id="millerHint">Mendukung indeks dengan minimal dua nilai bukan nol (mis. 100, 110, 111, 200). Kombinasi tiga indeks nol tidak valid.</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">5 · Sudut Pandang Kamera</div>
+        <div class="btn-grid three">
+          <button class="btn small" id="viewIso">Iso</button>
+          <button class="btn small" id="viewTop">Top</button>
+          <button class="btn small" id="viewFront">Front</button>
+          <button class="btn small" id="viewSide">Side</button>
+          <button class="btn small" id="viewResetCam">Reset View</button>
+          <button class="btn small" id="btnPlayAnim">▶ Animate</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">6 · Fitur Pembelajaran</div>
+        <div class="btn-grid">
+          <button class="btn amber" id="btnCompare">⚖ Compare</button>
+          <button class="btn amber" id="btnCustom">✎ Custom</button>
+          <button class="btn amber" id="btnQuiz">❓ Quiz</button>
+          <button class="btn amber" id="btnScreenshot">📷 Screenshot</button>
+        </div>
+        <button class="btn" style="width:100%;margin-top:8px;justify-content:center;" id="btnExport">⭳ Export Data (JSON / CSV)</button>
+      </div>
+
+    </aside>
+
+    <!-- ---------- VIEWPORT ---------- -->
+    <main id="viewport-container">
+      <div id="canvas3d"></div>
+
+      <div class="reticle tl"><svg viewBox="0 0 28 28"><path d="M2 12 V2 H12" stroke="#5ecbd8" stroke-width="2" fill="none"/></svg></div>
+      <div class="reticle tr"><svg viewBox="0 0 28 28"><path d="M2 12 V2 H12" stroke="#5ecbd8" stroke-width="2" fill="none"/></svg></div>
+      <div class="reticle bl"><svg viewBox="0 0 28 28"><path d="M2 12 V2 H12" stroke="#5ecbd8" stroke-width="2" fill="none"/></svg></div>
+      <div class="reticle br"><svg viewBox="0 0 28 28"><path d="M2 12 V2 H12" stroke="#5ecbd8" stroke-width="2" fill="none"/></svg></div>
+
+      <div class="viewport-overlay-top">
+        <div class="sys-name" id="ovSystemName">Kubik</div>
+        <div class="lat-name" id="ovLatticeName">Kubik Sederhana (P) · SC</div>
+      </div>
+
+      <div class="explode-bar">
+        <label>EXPLODE UNIT CELL <span id="explodeVal">0%</span></label>
+        <input type="range" id="explodeSlider" min="0" max="100" value="0">
+        <div class="btn-grid" style="margin-top:8px;">
+          <button class="btn small" id="btnExplodeNormal">Normal</button>
+          <button class="btn small" id="btnExplodeMax">Exploded</button>
+        </div>
+      </div>
+
+      <div class="legend-box" id="legendBox">
+        <div class="lt">Legenda Atom</div>
+        <div id="legendItems"></div>
+      </div>
+
+      <div class="view-controls">
+        <button class="btn" id="ctrlRotateInfo" title="Klik-tahan untuk rotate">🖱 Rotate</button>
+        <button class="btn" title="Scroll untuk zoom">🔍 Zoom</button>
+        <button class="btn" title="Klik-kanan tahan untuk pan">✋ Pan</button>
+      </div>
+    </main>
+
+    <!-- ---------- INFO / CALCULATION PANEL ---------- -->
+    <aside class="panel-col" id="info-panel">
+
+      <div class="section">
+        <div class="section-title">Crystal System Information</div>
+        <div class="theory-row"><span class="k">Sistem</span><span class="v" id="thSystem">—</span></div>
+        <div class="theory-row"><span class="k">Hubungan a,b,c</span><span class="v" id="thAbc">—</span></div>
+        <div class="theory-row"><span class="k">Hubungan α,β,γ</span><span class="v" id="thAngle">—</span></div>
+        <div class="theory-row"><span class="k">Jml. Bravais lattice</span><span class="v" id="thCount">—</span></div>
+        <div class="bravais-chips" id="thChips"></div>
+        <div class="theory-desc" id="thDesc">Pilih sistem kristal untuk melihat penjelasan.</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Hasil Perhitungan <small>real-time</small></div>
+        <div class="readout" id="readoutMain"></div>
+        <button class="calc-toggle" id="btnCalcToggle">▶ Tampilkan Perhitungan Atom Efektif</button>
+        <div class="calc-steps" id="calcSteps"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Titik Kisi (Raw Count)</div>
+        <div class="readout" id="readoutPoints"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Koordinasi &amp; Kerapatan</div>
+        <div class="readout" id="readoutCN"></div>
+        <div class="hint">APF dihitung dari asumsi bola identik bersinggungan sepanjang jarak tetangga terdekat hasil pencarian periodik titik kisi (r = d_min / 2). Untuk struktur dengan basis lebih dari satu atom, nilai ini merepresentasikan kisi titik itu sendiri.</div>
+      </div>
+
+    </aside>
+
+  </div>
+</div>
+
+<!-- ===================== MODAL: ABOUT ===================== -->
+<div class="modal-backdrop" id="modalAbout">
+  <div class="modal">
+    <div class="modal-head"><h2>Tentang CrystalSim 3D</h2><button class="modal-close" data-close="modalAbout">✕</button></div>
+    <div class="modal-body">
+      <p style="line-height:1.7;color:var(--text-2);">CrystalSim 3D adalah simulasi interaktif untuk memvisualisasikan 14 Kisi Bravais dari 7 sistem kristal dalam Fisika Zat Padat. Ubah sistem kristal, jenis kisi, dan parameter kisi (a, b, c, α, β, γ) menggunakan slider — geometri unit cell 3D, jumlah atom efektif, volume, rasio parameter, coordination number, dan Atomic Packing Factor akan diperbarui secara real-time.</p>
+      <ul style="line-height:1.9;color:var(--text-2);font-size:13.5px;">
+        <li>Rotate: klik kiri + drag pada viewport 3D</li>
+        <li>Zoom: scroll mouse / pinch pada trackpad</li>
+        <li>Pan: klik kanan + drag</li>
+        <li>Gunakan sidebar kiri untuk mengontrol struktur, sidebar kanan menampilkan teori &amp; hasil perhitungan otomatis.</li>
+      </ul>
+      <div class="about-dev">
+        <div>Developed by <b>Ainuzzaim Azzaki</b></div>
+        <div>NIM: <b>240321601033</b></div>
+        <div>Program Studi <b>Pendidikan Fisika</b></div>
+        <div style="color:var(--text-3);margin-top:6px;">Tugas Mata Kuliah Fisika Zat Padat</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: COMPARE ===================== -->
+<div class="modal-backdrop" id="modalCompare">
+  <div class="modal" style="max-width:920px;">
+    <div class="modal-head"><h2>⚖ Compare Bravais Lattice</h2><button class="modal-close" data-close="modalCompare">✕</button></div>
+    <div class="modal-body">
+      <div class="compare-grid">
+        <div class="compare-pick">
+          <select class="control-select" id="cmpSelectA"></select>
+          <div class="compare-canvas-wrap" id="cmpCanvasA"></div>
+        </div>
+        <div class="compare-pick">
+          <select class="control-select" id="cmpSelectB"></select>
+          <div class="compare-canvas-wrap" id="cmpCanvasB"></div>
+        </div>
+      </div>
+      <table class="cmp-table" id="cmpTable"></table>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: CUSTOM CRYSTAL ===================== -->
+<div class="modal-backdrop" id="modalCustom">
+  <div class="modal">
+    <div class="modal-head"><h2>✎ Custom Crystal Analyzer</h2><button class="modal-close" data-close="modalCustom">✕</button></div>
+    <div class="modal-body">
+      <p style="color:var(--text-2);font-size:13px;line-height:1.6;">Masukkan parameter kisi secara bebas. Aplikasi akan menganalisis dan mengklasifikasikan sistem kristal berdasarkan hubungan a,b,c dan α,β,γ.</p>
+      <div class="custom-grid">
+        <div class="field"><label class="field-label">a (Å)</label><input type="number" id="custA" value="3" step="0.05" min="0.5"></div>
+        <div class="field"><label class="field-label">b (Å)</label><input type="number" id="custB" value="3" step="0.05" min="0.5"></div>
+        <div class="field"><label class="field-label">c (Å)</label><input type="number" id="custC" value="3" step="0.05" min="0.5"></div>
+        <div class="field"><label class="field-label">α (°)</label><input type="number" id="custAlpha" value="90" step="0.5" min="1" max="179"></div>
+        <div class="field"><label class="field-label">β (°)</label><input type="number" id="custBeta" value="90" step="0.5" min="1" max="179"></div>
+        <div class="field"><label class="field-label">γ (°)</label><input type="number" id="custGamma" value="90" step="0.5" min="1" max="179"></div>
+      </div>
+      <button class="btn primary" style="margin-top:14px;" id="btnAnalyzeCustom">Analisis Sistem Kristal</button>
+      <div class="result-banner" id="custResult"></div>
+      <button class="btn" style="margin-top:12px;" id="btnLoadCustom" disabled>Muat ke Simulasi Utama (Mode Triclinic)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: QUIZ ===================== -->
+<div class="modal-backdrop" id="modalQuiz">
+  <div class="modal">
+    <div class="modal-head"><h2>❓ Quiz Mode — Uji Pemahaman</h2><button class="modal-close" data-close="modalQuiz">✕</button></div>
+    <div class="modal-body">
+      <div class="quiz-score" id="quizScore">Skor: 0 / 0</div>
+      <div class="quiz-q" id="quizQuestion"></div>
+      <div class="quiz-opts" id="quizOpts"></div>
+      <div class="quiz-explain" id="quizExplain"></div>
+      <button class="btn primary" style="margin-top:16px;" id="btnNextQuiz">Soal Berikutnya →</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ===================== LIBRARIES (CDN) ===================== -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+
+<script>
+/* =========================================================================================
+   CRYSTALSIM 3D — APPLICATION SCRIPT
+   Data-driven Bravais lattice engine. One rendering engine reads a lattice CONFIG object
+   (system, centering/offsets, constraints) instead of 14 separate hand-built visualizations.
+   Author of app logic follows solid-state-physics standard crystallography conventions.
+   ========================================================================================= */
+(function(){
+"use strict";
+
+/* ---------------------------------------------------------------------------------------
+   1. DATA MODEL — 7 crystal systems, 14 Bravais lattices, geometric constraint rules
+--------------------------------------------------------------------------------------- */
+
+const CRYSTAL_SYSTEMS = {
+  cubic: {
+    key:'cubic', name:'Kubik', nameEn:'Cubic',
+    relAbc:'a = b = c', relAngle:'α = β = γ = 90°', count:3,
+    desc:'Sistem dengan simetri tertinggi. Ketiga sumbu memiliki panjang sama dan saling tegak lurus. Contoh material: NaCl (FCC), Fe-α (BCC), Cu (FCC).'
+  },
+  tetragonal: {
+    key:'tetragonal', name:'Tetragonal', nameEn:'Tetragonal',
+    relAbc:'a = b ≠ c', relAngle:'α = β = γ = 90°', count:2,
+    desc:'Dua sumbu sama panjang (a,b) sedangkan sumbu c berbeda, seluruh sudut tetap 90°. Contoh material: TiO2 (rutile), Sn-putih.'
+  },
+  orthorhombic: {
+    key:'orthorhombic', name:'Ortorombik', nameEn:'Orthorhombic',
+    relAbc:'a ≠ b ≠ c', relAngle:'α = β = γ = 90°', count:4,
+    desc:'Ketiga sumbu memiliki panjang berbeda namun tetap saling tegak lurus 90°. Contoh material: sulfur rombik, aragonite.'
+  },
+  monoclinic: {
+    key:'monoclinic', name:'Monoklinik', nameEn:'Monoclinic',
+    relAbc:'a ≠ b ≠ c', relAngle:'α = γ = 90°, β ≠ 90°', count:2,
+    desc:'Ketiga sumbu berbeda panjang, dua sudut tegak lurus (α,γ = 90°) sedangkan β menyimpang dari 90° sehingga sel menjadi miring. Contoh material: gipsum.'
+  },
+  triclinic: {
+    key:'triclinic', name:'Triklinik', nameEn:'Triclinic',
+    relAbc:'a ≠ b ≠ c', relAngle:'α ≠ β ≠ γ ≠ 90°', count:1,
+    desc:'Simetri terendah — seluruh sumbu dan sudut bebas berbeda satu sama lain. Contoh material: K2Cr2O7, plagioclase feldspar.'
+  },
+  rhombohedral: {
+    key:'rhombohedral', name:'Rombohedral / Trigonal', nameEn:'Rhombohedral (Trigonal)',
+    relAbc:'a = b = c', relAngle:'α = β = γ ≠ 90°', count:1,
+    desc:'Ketiga sumbu sama panjang dan ketiga sudut sama besar namun tidak 90°, membentuk kubus yang "diregangkan" sepanjang diagonal ruang. Contoh material: kalsit (CaCO3), kuarsa-α.'
+  },
+  hexagonal: {
+    key:'hexagonal', name:'Heksagonal', nameEn:'Hexagonal',
+    relAbc:'a = b ≠ c', relAngle:'α = β = 90°, γ = 120°', count:1,
+    desc:'Dua sumbu sama panjang bertemu pada sudut 120°, sumbu c tegak lurus terhadap keduanya. Sel primitif berbentuk prisma dengan alas jajar genjang 120°. Contoh material: Mg, Zn, grafit.'
+  }
+};
+
+// centering offsets in FRACTIONAL coordinates, reduced representation.
+// n_eff (atom efektif per sel konvensional) = offsets.length  (identitas standar kristalografi)
+const CENTERING_OFFSETS = {
+  P: [[0,0,0]],
+  I: [[0,0,0],[0.5,0.5,0.5]],
+  F: [[0,0,0],[0.5,0.5,0],[0.5,0,0.5],[0,0.5,0.5]],
+  C: [[0,0,0],[0.5,0.5,0]]
+};
+
+const CENTERING_LABEL = {P:'Primitive',I:'Body-Centered',F:'Face-Centered',C:'Base-Centered',R:'Rhombohedral'};
+
+// SYSTEM_CONSTRAINTS: how slider b,c / angles follow or lock relative to a / alpha
+// 'a' or 'alpha' -> value forced equal to that slider; number -> fixed constant; false -> free
+const SYSTEM_CONSTRAINTS = {
+  cubic:        { b:'a', c:'a', alpha:90, beta:90, gamma:90 },
+  tetragonal:   { b:'a', c:false, alpha:90, beta:90, gamma:90 },
+  orthorhombic: { b:false, c:false, alpha:90, beta:90, gamma:90 },
+  monoclinic:   { b:false, c:false, alpha:90, beta:false, gamma:90 },
+  triclinic:    { b:false, c:false, alpha:false, beta:false, gamma:false },
+  rhombohedral: { b:'a', c:'a', alpha:false, beta:'alpha', gamma:'alpha' },
+  hexagonal:    { b:'a', c:false, alpha:90, beta:90, gamma:120 }
+};
+
+// The 14 Bravais lattices — single source of truth read by the generic engine.
+const BRAVAIS_LATTICES = [
+  {id:'cubic-P', system:'cubic', centering:'P', abbr:'SC',  label:'Kubik Sederhana (P)', labelEn:'Simple Cubic', def:{a:3,b:3,c:3,alpha:90,beta:90,gamma:90}},
+  {id:'cubic-I', system:'cubic', centering:'I', abbr:'BCC', label:'Kubik Berpusat Badan (I)', labelEn:'Body-Centered Cubic', def:{a:3,b:3,c:3,alpha:90,beta:90,gamma:90}},
+  {id:'cubic-F', system:'cubic', centering:'F', abbr:'FCC', label:'Kubik Berpusat Muka (F)', labelEn:'Face-Centered Cubic', def:{a:3,b:3,c:3,alpha:90,beta:90,gamma:90}},
+
+  {id:'tetragonal-P', system:'tetragonal', centering:'P', abbr:'ST',  label:'Tetragonal Sederhana (P)', labelEn:'Simple Tetragonal', def:{a:3,b:3,c:4.6,alpha:90,beta:90,gamma:90}},
+  {id:'tetragonal-I', system:'tetragonal', centering:'I', abbr:'BCT', label:'Tetragonal Berpusat Badan (I)', labelEn:'Body-Centered Tetragonal', def:{a:3,b:3,c:4.6,alpha:90,beta:90,gamma:90}},
+
+  {id:'orthorhombic-P', system:'orthorhombic', centering:'P', abbr:'SO',  label:'Ortorombik Sederhana (P)', labelEn:'Simple Orthorhombic', def:{a:2.6,b:3.6,c:4.6,alpha:90,beta:90,gamma:90}},
+  {id:'orthorhombic-I', system:'orthorhombic', centering:'I', abbr:'BCO', label:'Ortorombik Berpusat Badan (I)', labelEn:'Body-Centered Orthorhombic', def:{a:2.6,b:3.6,c:4.6,alpha:90,beta:90,gamma:90}},
+  {id:'orthorhombic-F', system:'orthorhombic', centering:'F', abbr:'FCO', label:'Ortorombik Berpusat Muka (F)', labelEn:'Face-Centered Orthorhombic', def:{a:2.6,b:3.6,c:4.6,alpha:90,beta:90,gamma:90}},
+  {id:'orthorhombic-C', system:'orthorhombic', centering:'C', abbr:'BCO-C', label:'Ortorombik Berpusat Basis (C)', labelEn:'Base-Centered Orthorhombic', def:{a:2.6,b:3.6,c:4.6,alpha:90,beta:90,gamma:90}},
+
+  {id:'monoclinic-P', system:'monoclinic', centering:'P', abbr:'SM',  label:'Monoklinik Sederhana (P)', labelEn:'Simple Monoclinic', def:{a:2.8,b:3.6,c:4.4,alpha:90,beta:107,gamma:90}},
+  {id:'monoclinic-C', system:'monoclinic', centering:'C', abbr:'BCM', label:'Monoklinik Berpusat Basis (C)', labelEn:'Base-Centered Monoclinic', def:{a:2.8,b:3.6,c:4.4,alpha:90,beta:107,gamma:90}},
+
+  {id:'triclinic-P', system:'triclinic', centering:'P', abbr:'TRI', label:'Triklinik Sederhana (P)', labelEn:'Triclinic', def:{a:2.8,b:3.4,c:4.0,alpha:78,beta:94,gamma:108}},
+
+  {id:'rhombohedral-R', system:'rhombohedral', centering:'R', abbr:'R', label:'Rombohedral (R)', labelEn:'Rhombohedral', def:{a:3.4,b:3.4,c:3.4,alpha:78,beta:78,gamma:78}},
+
+  {id:'hexagonal-P', system:'hexagonal', centering:'P', abbr:'HEX', label:'Heksagonal Sederhana (P)', labelEn:'Hexagonal', def:{a:3,b:3,c:4.9,alpha:90,beta:90,gamma:120}}
+];
+
+function latticesForSystem(sysKey){ return BRAVAIS_LATTICES.filter(l=>l.system===sysKey); }
+function getLattice(id){ return BRAVAIS_LATTICES.find(l=>l.id===id); }
+
+/* ---------------------------------------------------------------------------------------
+   2. CRYSTALLOGRAPHIC MATH ENGINE
+--------------------------------------------------------------------------------------- */
+
+const D2R = Math.PI/180;
+
+// Standard crystallographic convention: a along x, b in xy-plane, c completes triclinic cell.
+function latticeVectors(a,b,c,alpha,beta,gamma){
+  const al=alpha*D2R, be=beta*D2R, ga=gamma*D2R;
+  const va = [a,0,0];
+  const vb = [b*Math.cos(ga), b*Math.sin(ga), 0];
+  const cosA=Math.cos(al), cosB=Math.cos(be), cosG=Math.cos(ga), sinG=Math.sin(ga);
+  const cx = c*cosB;
+  const cy = c*(cosA-cosB*cosG)/ (Math.abs(sinG)<1e-9?1e-9:sinG);
+  let inner = 1 - cosA*cosA - cosB*cosB - cosG*cosG + 2*cosA*cosB*cosG;
+  if(inner<0) inner=0;
+  const cz = c*Math.sqrt(inner)/(Math.abs(sinG)<1e-9?1e-9:sinG);
+  const vc = [cx,cy,cz];
+  return {va,vb,vc};
+}
+function vAdd(...vs){ return vs.reduce((r,v)=>[r[0]+v[0],r[1]+v[1],r[2]+v[2]],[0,0,0]); }
+function vScale(v,s){ return [v[0]*s,v[1]*s,v[2]*s]; }
+function vSub(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
+function vCross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function vDot(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+function vLen(a){ return Math.sqrt(vDot(a,a)); }
+
+function fracToCart(frac, va, vb, vc){
+  return vAdd(vScale(va,frac[0]), vScale(vb,frac[1]), vScale(vc,frac[2]));
+}
+
+function cellVolume(va,vb,vc){ return Math.abs(vDot(va, vCross(vb,vc))); }
+
+// Generates full "raw" atom set for visualization/counting: 8 corners + extra centering atoms
+// with their crystallographic weight (contribution fraction).
+function fullAtomSet(centering){
+  const atoms = [];
+  for(let x=0;x<=1;x++) for(let y=0;y<=1;y++) for(let z=0;z<=1;z++){
+    atoms.push({frac:[x,y,z], weight:1/8, role:'corner'});
+  }
+  if(centering==='I'){
+    atoms.push({frac:[0.5,0.5,0.5], weight:1, role:'body'});
+  } else if(centering==='F'){
+    atoms.push({frac:[0.5,0.5,0], weight:0.5, role:'face'});
+    atoms.push({frac:[0.5,0.5,1], weight:0.5, role:'face'});
+    atoms.push({frac:[0.5,0,0.5], weight:0.5, role:'face'});
+    atoms.push({frac:[0.5,1,0.5], weight:0.5, role:'face'});
+    atoms.push({frac:[0,0.5,0.5], weight:0.5, role:'face'});
+    atoms.push({frac:[1,0.5,0.5], weight:0.5, role:'face'});
+  } else if(centering==='C'){
+    atoms.push({frac:[0.5,0.5,0], weight:0.5, role:'base'});
+    atoms.push({frac:[0.5,0.5,1], weight:0.5, role:'base'});
+  }
+  return atoms;
+}
+
+// Effective atoms per conventional unit cell (standard crystallographic result == offsets.length)
+function effectiveAtoms(centering){ return CENTERING_OFFSETS[centering].length; }
+
+// Nearest-neighbour search across periodic images of the point lattice (offsets + integer
+// translations of va,vb,vc). This lets us compute Coordination Number and hard-sphere radius
+// (for APF) *geometrically and correctly* for ALL 14 lattices, instead of hardcoding values.
+function neighborStats(va,vb,vc,centering){
+  const offsets = CENTERING_OFFSETS[centering];
+  const RANGE = 2;
+  let dmin = Infinity;
+  const dists = [];
+  for(let n1=-RANGE;n1<=RANGE;n1++)
+  for(let n2=-RANGE;n2<=RANGE;n2++)
+  for(let n3=-RANGE;n3<=RANGE;n3++)
+  for(const off of offsets){
+    const fx=n1+off[0], fy=n2+off[1], fz=n3+off[2];
+    if(Math.abs(fx)<1e-9 && Math.abs(fy)<1e-9 && Math.abs(fz)<1e-9) continue; // skip origin
+    const cart = vAdd(vScale(va,fx), vScale(vb,fy), vScale(vc,fz));
+    const d = vLen(cart);
+    dists.push(d);
+    if(d<dmin) dmin=d;
+  }
+  let cn=0;
+  const tol = dmin*1e-3 + 1e-6;
+  for(const d of dists){ if(Math.abs(d-dmin)<tol) cn++; }
+  return {dmin, cn};
+}
+
+function computeAll(params, lat){
+  const {a,b,c,alpha,beta,gamma} = params;
+  const {va,vb,vc} = latticeVectors(a,b,c,alpha,beta,gamma);
+  const V = cellVolume(va,vb,vc);
+  const nEff = effectiveAtoms(lat.centering);
+  const {dmin, cn} = neighborStats(va,vb,vc,lat.centering);
+  const r = dmin/2;
+  const apf = V>1e-9 ? (nEff*(4/3)*Math.PI*Math.pow(r,3))/V : 0;
+  const atoms = fullAtomSet(lat.centering);
+  const cornerCount = atoms.filter(a=>a.role==='corner').length;
+  const faceCount = atoms.filter(a=>a.role==='face').length;
+  const bodyCount = atoms.filter(a=>a.role==='body').length;
+  const baseCount = atoms.filter(a=>a.role==='base').length;
+  return {va,vb,vc,V,nEff,dmin,cn,apf,atoms,cornerCount,faceCount,bodyCount,baseCount,r};
+}
+
+/* ---------------------------------------------------------------------------------------
+   3. APPLICATION STATE
+--------------------------------------------------------------------------------------- */
+
+const state = {
+  system:'cubic',
+  latticeId:'cubic-P',
+  params:{a:3,b:3,c:3,alpha:90,beta:90,gamma:90},
+  explode:0,
+  displayMode:'ballstick',
+  show:{axes:true, vectors:true, atomLabels:false, cell:true, bonds:true, coords:false, plane:false},
+  miller:{h:1,k:1,l:1, active:false}
+};
+
+const DEFAULT_STATE = JSON.parse(JSON.stringify(state));
+
+/* ---------------------------------------------------------------------------------------
+   4. THREE.JS ENGINE  (single reusable engine, instantiated for main view + compare views)
+--------------------------------------------------------------------------------------- */
+
+function createEngine(container, opts){
+  opts = opts||{};
+  const engine = {};
+  const scene = new THREE.Scene();
+  scene.background = null;
+  engine.scene = scene;
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+  camera.position.set(9,7,10);
+  engine.camera = camera;
+
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  container.appendChild(renderer.domElement);
+  engine.renderer = renderer;
+
+  let labelRenderer = null;
+  if(!opts.noLabels){
+    labelRenderer = new THREE.CSS2DRenderer();
+    labelRenderer.domElement.style.position='absolute';
+    labelRenderer.domElement.style.top='0';
+    labelRenderer.domElement.style.left='0';
+    labelRenderer.domElement.style.pointerEvents='none';
+    container.appendChild(labelRenderer.domElement);
+  }
+  engine.labelRenderer = labelRenderer;
+
+  const controls = new THREE.OrbitControls(camera, labelRenderer?labelRenderer.domElement:renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 3;
+  controls.maxDistance = 60;
+  if(labelRenderer) labelRenderer.domElement.style.pointerEvents='auto';
+  engine.controls = controls;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const dl1 = new THREE.DirectionalLight(0xffffff, 0.9); dl1.position.set(10,14,8); scene.add(dl1);
+  const dl2 = new THREE.DirectionalLight(0x5ecbd8, 0.35); dl2.position.set(-10,-6,-8); scene.add(dl2);
+
+  const group = new THREE.Group();
+  scene.add(group);
+  engine.group = group;
+
+  function resize(){
+    const w = container.clientWidth||1, h = container.clientHeight||1;
+    camera.aspect = w/h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w,h);
+    if(labelRenderer) labelRenderer.setSize(w,h);
+  }
+  engine.resize = resize;
+  resize();
+  new ResizeObserver(resize).observe(container);
+
+  function animateLoop(){
+    requestAnimationFrame(animateLoop);
+    controls.update();
+    renderer.render(scene, camera);
+    if(labelRenderer) labelRenderer.render(scene, camera);
+  }
+  animateLoop();
+
+  engine.setView = function(mode){
+    const d = 11;
+    if(mode==='iso') camera.position.set(d*0.7, d*0.62, d*0.7);
+    else if(mode==='top') camera.position.set(0.001, d, 0.001);
+    else if(mode==='front') camera.position.set(0.001, 0.001, d);
+    else if(mode==='side') camera.position.set(d, 0.001, 0.001);
+    controls.target.set(0,0,0);
+    controls.update();
+  };
+
+  return engine;
+}
+
+/* Build/refresh a full lattice scene inside a given engine, from params+lattice+options */
+function buildScene(engine, params, lat, opts){
+  opts = opts || {};
+  const show = opts.show || state.show;
+  const explode = (opts.explode!=null)? opts.explode : state.explode;
+  const displayMode = opts.displayMode || state.displayMode;
+  const miller = opts.miller || state.miller;
+
+  // clear previous
+  while(engine.group.children.length) engine.group.remove(engine.group.children[0]);
+
+  const calc = computeAll(params, lat);
+  const {va,vb,vc,atoms} = calc;
+  const scaleFactor = 1.0; // 1 scene unit == 1 Angstrom for direct physical mapping
+
+  const S = v=>vScale(v,scaleFactor);
+  const VA = S(va), VB = S(vb), VC = S(vc);
+
+  // centroid for explode direction & camera centering
+  const centroid = vScale(vAdd(VA,VB,VC), 0.5);
+
+  function toScene(frac){
+    let cart = fracToCart(frac, VA, VB, VC);
+    if(explode>0){
+      const dir = vSub(cart, centroid);
+      cart = vAdd(cart, vScale(dir, explode/100 * 0.9));
+    }
+    return new THREE.Vector3(cart[0]-centroid[0], cart[1]-centroid[1], cart[2]-centroid[2]);
+  }
+
+  const roleColor = {corner:0x5ecbd8, face:0xffb454, body:0xff8fb1, base:0xc7a3ff};
+  const roleRadius = {corner:0.18, face:0.20, body:0.24, base:0.20};
+
+  // ---- Unit cell wireframe ----
+  if(show.cell && displayMode!=='points'){
+    const corners = [];
+    for(let x=0;x<=1;x++) for(let y=0;y<=1;y++) for(let z=0;z<=1;z++) corners.push([x,y,z]);
+    const edgeIdx = [
+      [0,0,0,1,0,0],[0,1,0,1,1,0],[0,0,1,1,0,1],[0,1,1,1,1,1],
+      [0,0,0,0,1,0],[1,0,0,1,1,0],[0,0,1,0,1,1],[1,0,1,1,1,1],
+      [0,0,0,0,0,1],[1,0,0,1,0,1],[0,1,0,0,1,1],[1,1,0,1,1,1]
+    ];
+    const positions = [];
+    edgeIdx.forEach(e=>{
+      const p1 = toScene([e[0],e[1],e[2]]);
+      const p2 = toScene([e[3],e[4],e[5]]);
+      positions.push(p1.x,p1.y,p1.z, p2.x,p2.y,p2.z);
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+    const mat = new THREE.LineBasicMaterial({color:0x5ecbd8, transparent:true, opacity:0.85});
+    const lines = new THREE.LineSegments(geo, mat);
+    engine.group.add(lines);
+
+    if(displayMode==='wireframe' || displayMode==='cellonly'){
+      // translucent faces for extra clarity in wireframe mode
+    }
+  }
+
+  // ---- lattice vectors a, b, c ----
+  if(show.vectors){
+    const origin = toScene([0,0,0]);
+    const mkArrow = (target, color, label)=>{
+      const dir = new THREE.Vector3().subVectors(target, origin);
+      const len = dir.length();
+      if(len<0.01) return;
+      dir.normalize();
+      const arrow = new THREE.ArrowHelper(dir, origin, len, color, Math.min(0.45,len*0.18), Math.min(0.25,len*0.12));
+      engine.group.add(arrow);
+      if(engine.labelRenderer){
+        const div = document.createElement('div');
+        div.className='css2d-label vec';
+        div.textContent = label;
+        const obj = new THREE.CSS2DObject(div);
+        obj.position.copy(target);
+        engine.group.add(obj);
+      }
+    };
+    mkArrow(toScene([1,0,0]), 0xff6b6b, 'a');
+    mkArrow(toScene([0,1,0]), 0x7ee0a8, 'b');
+    mkArrow(toScene([0,0,1]), 0x5ecbd8, 'c');
+  }
+
+  // ---- world axes X Y Z (fixed length reference, separate from a/b/c vectors) ----
+  if(show.axes){
+    const axLen = Math.max(vLen(VA),vLen(VB),vLen(VC))*0.75+1.5;
+    const mkAxis = (dir,color,label)=>{
+      const ah = new THREE.ArrowHelper(dir.clone().normalize(), new THREE.Vector3(0,0,0), axLen, color, 0.3, 0.16);
+      ah.line.material.transparent = true; ah.line.material.opacity=0.35;
+      ah.cone.material.transparent = true; ah.cone.material.opacity=0.35;
+      engine.group.add(ah);
+      if(engine.labelRenderer){
+        const div = document.createElement('div');
+        div.className='css2d-label axis';
+        div.textContent = label;
+        const obj = new THREE.CSS2DObject(div);
+        obj.position.copy(dir.clone().multiplyScalar(axLen));
+        engine.group.add(obj);
+      }
+    };
+    mkAxis(new THREE.Vector3(1,0,0),0xffb454,'X');
+    mkAxis(new THREE.Vector3(0,1,0),0xffb454,'Y');
+    mkAxis(new THREE.Vector3(0,0,1),0xffb454,'Z');
+  }
+
+  // ---- Atoms ----
+  if(displayMode!=='cellonly'){
+    const sphereGeoCache = {};
+    atoms.forEach((atom, idx)=>{
+      const pos = toScene(atom.frac);
+      let radius = roleRadius[atom.role]||0.18;
+      if(displayMode==='spacefill') radius = calc.r * 0.98;
+      if(displayMode==='points') radius = 0.09;
+      radius = Math.max(radius, 0.06);
+      const key = radius.toFixed(3);
+      if(!sphereGeoCache[key]) sphereGeoCache[key] = new THREE.SphereGeometry(radius, 24, 18);
+      const mat = new THREE.MeshStandardMaterial({
+        color: roleColor[atom.role]||0xffffff,
+        metalness:0.25, roughness:0.45,
+        transparent: displayMode==='wireframe',
+        opacity: displayMode==='wireframe'?0.35:1,
+        wireframe: displayMode==='wireframe'
+      });
+      const mesh = new THREE.Mesh(sphereGeoCache[key], mat);
+      mesh.position.copy(pos);
+      engine.group.add(mesh);
+
+      if(show.atomLabels && engine.labelRenderer){
+        const div = document.createElement('div');
+        div.className='css2d-label';
+        const roleAbbr = {corner:'sudut',face:'muka',body:'badan',base:'basis'}[atom.role];
+        div.textContent = roleAbbr + ' (' + atom.weight.toFixed(3).replace(/0+$/,'').replace(/\.$/,'') + ')';
+        const obj = new THREE.CSS2DObject(div);
+        obj.position.copy(pos).add(new THREE.Vector3(0,radius+0.22,0));
+        engine.group.add(obj);
+      }
+      if(show.coords && engine.labelRenderer){
+        const div2 = document.createElement('div');
+        div2.className='css2d-label';
+        div2.style.color = '#7ee0a8';
+        div2.textContent = `(${atom.frac[0]},${atom.frac[1]},${atom.frac[2]})`;
+        const obj2 = new THREE.CSS2DObject(div2);
+        obj2.position.copy(pos).add(new THREE.Vector3(0,-(radius+0.22),0));
+        engine.group.add(obj2);
+      }
+    });
+
+    // ---- Bonds (ball & stick): connect nearest-neighbour pairs within the drawn atom set ----
+    if(show.bonds && displayMode==='ballstick'){
+      const positions = atoms.map(a=>toScene(a.frac));
+      const bondMat = new THREE.MeshStandardMaterial({color:0x3a4a58, metalness:0.1, roughness:0.7});
+      const nnDist = calc.dmin;
+      for(let i=0;i<positions.length;i++){
+        for(let j=i+1;j<positions.length;j++){
+          const d = positions[i].distanceTo(positions[j]);
+          if(d>0.05 && d < nnDist*1.06){
+            const mid = new THREE.Vector3().addVectors(positions[i],positions[j]).multiplyScalar(0.5);
+            const dir = new THREE.Vector3().subVectors(positions[j],positions[i]);
+            const len = dir.length();
+            const cyl = new THREE.CylinderGeometry(0.045,0.045,len,8);
+            const mesh = new THREE.Mesh(cyl, bondMat);
+            mesh.position.copy(mid);
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+            engine.group.add(mesh);
+          }
+        }
+      }
+    }
+  }
+
+  // ---- Miller plane ----
+  if(show.plane && miller && miller.active){
+    addMillerPlane(engine, VA, VB, VC, centroid, miller);
+  }
+
+  return calc;
+}
+
+// Modular Miller-index plane visualizer. Supports the common, well-defined cases:
+// all indices non-zero, or exactly one index zero (plane parallel to that axis).
+// Three indices simultaneously zero is undefined and rejected by the UI.
+function addMillerPlane(engine, VA,VB,VC, centroid, miller){
+  const {h,k,l} = miller;
+  const zeros = [h,k,l].filter(v=>v===0).length;
+  if(zeros>=2 && !(h===0&&k===0&&l===0)){
+    // one nonzero index -> plane is a full face of the cell, handled below generically too
+  }
+  if(h===0&&k===0&&l===0) return;
+
+  const inv = v => v===0? null : 1/v;
+  const hi=inv(h), ki=inv(k), li=inv(l);
+
+  // Collect boundary points of the plane inside fractional cube [0,1]^3
+  let fracPts = [];
+  if(hi!==null && ki!==null && li!==null){
+    fracPts = [[hi,0,0],[0,ki,0],[0,0,li]];
+  } else {
+    // exactly one or two indices are zero -> build a quad spanning the free axis/axes
+    const axisFree = [h===0, k===0, l===0]; // true = free (spans 0..1)
+    const fixedVal = [hi,ki,li];
+    if(zeros===1){
+      // plane parallel to one axis -> rectangle
+      const freeAxis = axisFree.indexOf(true);
+      const others = [0,1,2].filter(i=>i!==freeAxis);
+      const p = [0,0,0]; p[others[0]] = fixedVal[others[0]]; p[others[1]] = fixedVal[others[1]];
+      const p0 = p.slice(); p0[freeAxis]=0;
+      const p1 = p.slice(); p1[freeAxis]=1;
+      // need 4 points: shift along others too? For a simple (110)-like plane the intercepts already define a line;
+      // extend to a rectangle spanning the free axis:
+      fracPts = [p0, p1];
+      // The other two intercept points at the axis extremes to close the rectangle:
+      const q0 = [0,0,0]; q0[others[0]]=fixedVal[others[0]]; q0[others[1]]=fixedVal[others[1]]; q0[freeAxis]=0;
+      fracPts = [
+        (()=>{const a=[0,0,0]; a[others[0]]=fixedVal[others[0]]; a[freeAxis]=0; a[others[1]]=0; return a;})(),
+        (()=>{const a=[0,0,0]; a[others[0]]=0; a[others[1]]=fixedVal[others[1]]; a[freeAxis]=0; return a;})(),
+        (()=>{const a=[0,0,0]; a[others[0]]=0; a[others[1]]=fixedVal[others[1]]; a[freeAxis]=1; return a;})(),
+        (()=>{const a=[0,0,0]; a[others[0]]=fixedVal[others[0]]; a[others[1]]=0; a[freeAxis]=1; return a;})()
+      ];
+    } else if(zeros===2){
+      // plane is a full face perpendicular to the single non-zero axis
+      const fixedAxis = [0,1,2].find(i=>[h,k,l][i]!==0);
+      const val = fixedVal[fixedAxis];
+      const corners = [];
+      for(let u=0;u<=1;u++) for(let v=0;v<=1;v++){
+        const p=[0,0,0]; p[fixedAxis]=val;
+        const others=[0,1,2].filter(i=>i!==fixedAxis);
+        p[others[0]]=u; p[others[1]]=v;
+        corners.push(p);
+      }
+      fracPts = [corners[0],corners[1],corners[3],corners[2]];
+    }
+  }
+  if(fracPts.length<3) return;
+
+  const S = v=>vAdd(vScale(VA,v[0]), vScale(VB,v[1]), vScale(VC,v[2]));
+  const pts3 = fracPts.map(f=>{ const c=S(f); return new THREE.Vector3(c[0]-centroid[0], c[1]-centroid[1], c[2]-centroid[2]); });
+
+  const geo = new THREE.BufferGeometry();
+  let idx;
+  const posArr = [];
+  pts3.forEach(p=>posArr.push(p.x,p.y,p.z));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr,3));
+  if(pts3.length===3){ idx=[0,1,2]; } else { idx=[0,1,2,0,2,3]; }
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshBasicMaterial({color:0xffb454, transparent:true, opacity:0.32, side:THREE.DoubleSide});
+  const mesh = new THREE.Mesh(geo, mat);
+  engine.group.add(mesh);
+  const wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color:0xffb454}));
+  engine.group.add(wire);
+}
+
+/* ---------------------------------------------------------------------------------------
+   5. MAIN ENGINE INSTANCE + UI WIRING
+--------------------------------------------------------------------------------------- */
+
+const mainContainer = document.getElementById('canvas3d');
+const mainEngine = createEngine(mainContainer);
+mainEngine.setView('iso');
+
+let lastCalc = null;
+
+function currentLattice(){ return getLattice(state.latticeId); }
+
+function applyConstraints(){
+  const c = SYSTEM_CONSTRAINTS[state.system];
+  const p = state.params;
+  if(c.b==='a') p.b = p.a; else if(typeof c.b==='number') p.b=c.b;
+  if(c.c==='a') p.c = p.a; else if(typeof c.c==='number') p.c=c.c;
+  if(c.alpha==='alpha'){} else if(typeof c.alpha==='number') p.alpha=c.alpha;
+  if(c.beta==='alpha') p.beta = p.alpha; else if(typeof c.beta==='number') p.beta=c.beta;
+  if(c.gamma==='alpha') p.gamma = p.alpha; else if(typeof c.gamma==='number') p.gamma=c.gamma;
+}
+
+function refreshSliderLocksAndValues(){
+  const c = SYSTEM_CONSTRAINTS[state.system];
+  const lockMap = {a:false, b:c.b!==false, c:c.c!==false, alpha:c.alpha!==false, beta:c.beta!==false, gamma:c.gamma!==false};
+  ['a','b','c','alpha','beta','gamma'].forEach(k=>{
+    const slider = document.getElementById('slider-'+k);
+    const row = document.getElementById('row-'+k);
+    slider.disabled = lockMap[k];
+    row.classList.toggle('locked', lockMap[k]);
+    slider.value = state.params[k];
+    const unit = (k==='a'||k==='b'||k==='c') ? ' Å' : '°';
+    document.getElementById('val-'+k).textContent = Number(state.params[k]).toFixed(2).replace(/\.00$/, '.00') + unit;
+  });
+}
+
+function renderMain(){
+  applyConstraints();
+  const lat = currentLattice();
+  lastCalc = buildScene(mainEngine, state.params, lat, {show:state.show, explode:state.explode, displayMode:state.displayMode, miller:{...state.miller, active: state.show.plane}});
+  updateOverlay(lat);
+  updateInfoPanels(lat, lastCalc);
+  refreshSliderLocksAndValues();
+}
+
+function updateOverlay(lat){
+  document.getElementById('ovSystemName').textContent = CRYSTAL_SYSTEMS[lat.system].name;
+  document.getElementById('ovLatticeName').textContent = lat.label + ' · ' + lat.abbr;
+}
+
+function fmt(n, d){ if(!isFinite(n)) return '—'; return Number(n).toFixed(d==null?3:d); }
+
+function updateInfoPanels(lat, calc){
+  // theory panel
+  const sys = CRYSTAL_SYSTEMS[lat.system];
+  document.getElementById('thSystem').textContent = sys.name + ' / ' + sys.nameEn;
+  document.getElementById('thAbc').textContent = sys.relAbc;
+  document.getElementById('thAngle').textContent = sys.relAngle;
+  document.getElementById('thCount').textContent = sys.count;
+  document.getElementById('thDesc').textContent = sys.desc;
+  document.getElementById('thChips').innerHTML = latticesForSystem(lat.system).map(l=>`<span class="bravais-chip">${l.centering} · ${l.abbr}</span>`).join('');
+
+  const p = state.params;
+  const readoutMain = document.getElementById('readoutMain');
+  readoutMain.innerHTML = `
+    <div class="readout-row"><span class="k">Sistem Kristal</span><span class="v teal">${sys.name}</span></div>
+    <div class="readout-row"><span class="k">Jenis Kisi</span><span class="v teal">${lat.label}</span></div>
+    <div class="readout-row"><span class="k">Atom Efektif / sel</span><span class="v">${fmt(calc.nEff,0)}</span></div>
+    <div class="readout-row"><span class="k">Volume Unit Cell</span><span class="v">${fmt(calc.V,3)} Å³</span></div>
+    <div class="readout-row"><span class="k">Rasio b/a</span><span class="v">${fmt(p.b/p.a,3)}</span></div>
+    <div class="readout-row"><span class="k">Rasio c/a</span><span class="v">${fmt(p.c/p.a,3)}</span></div>
+  `;
+
+  document.getElementById('readoutPoints').innerHTML = `
+    <div class="readout-row"><span class="k">Titik sudut (corner)</span><span class="v">${calc.cornerCount}</span></div>
+    <div class="readout-row"><span class="k">Titik muka (face)</span><span class="v">${calc.faceCount}</span></div>
+    <div class="readout-row"><span class="k">Titik badan (body)</span><span class="v">${calc.bodyCount}</span></div>
+    <div class="readout-row"><span class="k">Titik basis (base)</span><span class="v">${calc.baseCount}</span></div>
+  `;
+
+  document.getElementById('readoutCN').innerHTML = `
+    <div class="readout-row"><span class="k">Jarak tetangga terdekat</span><span class="v">${fmt(calc.dmin,3)} Å</span></div>
+    <div class="readout-row"><span class="k">Coordination Number (CN)</span><span class="v">${calc.cn}</span></div>
+    <div class="readout-row"><span class="k">Radius atom (r = d_min/2)</span><span class="v">${fmt(calc.r,3)} Å</span></div>
+    <div class="readout-row"><span class="k">Atomic Packing Factor</span><span class="v">${fmt(calc.apf,4)}</span></div>
+    <div class="readout-row"><span class="k">Packing Efficiency</span><span class="v">${fmt(calc.apf*100,2)} %</span></div>
+  `;
+
+  // legend
+  const roleColorHex = {corner:'#5ecbd8', face:'#ffb454', body:'#ff8fb1', base:'#c7a3ff'};
+  const roleLabel = {corner:'Atom Sudut (1/8)', face:'Atom Muka (1/2)', body:'Atom Badan (1)', base:'Atom Basis (1/2)'};
+  const rolesPresent = [...new Set(calc.atoms.map(a=>a.role))];
+  document.getElementById('legendItems').innerHTML = rolesPresent.map(r=>`<div class="legend-tag"><span class="legend-dot" style="background:${roleColorHex[r]}"></span>${roleLabel[r]}</div>`).join('');
+
+  // calc steps
+  renderCalcSteps(lat, calc);
+}
+
+function renderCalcSteps(lat, calc){
+  const parts = [];
+  const weightLabel = {corner:'1/8 (sudut)', face:'1/2 (muka)', body:'1 (badan)', base:'1/2 (basis)'};
+  const grouped = {};
+  calc.atoms.forEach(a=>{ grouped[a.role]=(grouped[a.role]||0)+1; });
+  Object.keys(grouped).forEach(role=>{
+    const w = {corner:1/8, face:1/2, body:1, base:1/2}[role];
+    parts.push(`${grouped[role]} × ${weightLabel[role]} = <span class="eq">${(grouped[role]*w).toFixed(3).replace(/0+$/,'').replace(/\.$/,'')}</span>`);
+  });
+  const total = parts.length? calc.nEff : 0;
+  document.getElementById('calcSteps').innerHTML =
+    `<div><b>Kontribusi atom — ${lat.label}</b></div>` +
+    parts.map(p=>`<div>${p}</div>`).join('') +
+    `<div style="margin-top:6px;border-top:1px solid var(--border-soft);padding-top:6px;">Total atom efektif = <span class="eq">${calc.nEff}</span> atom/unit cell</div>` +
+    `<div style="margin-top:10px;"><b>Volume</b></div>` +
+    `<div>V = abc·√(1+2cosα·cosβ·cosγ − cos²α−cos²β−cos²γ)</div>` +
+    `<div>V = <span class="eq">${fmt(calc.V,3)} Å³</span></div>` +
+    `<div style="margin-top:10px;"><b>Atomic Packing Factor</b></div>` +
+    `<div>r = d_min / 2 = <span class="eq">${fmt(calc.r,3)} Å</span></div>` +
+    `<div>APF = (n × 4/3·π·r³) / V = <span class="eq">${fmt(calc.apf,4)}</span></div>`;
+}
+
+/* ---------------------------------------------------------------------------------------
+   6. UI: dropdowns, sliders, checkboxes, buttons
+--------------------------------------------------------------------------------------- */
+
+const selSystem = document.getElementById('selSystem');
+const selLattice = document.getElementById('selLattice');
+
+Object.keys(CRYSTAL_SYSTEMS).forEach(k=>{
+  const opt = document.createElement('option');
+  opt.value=k; opt.textContent = CRYSTAL_SYSTEMS[k].name;
+  selSystem.appendChild(opt);
+});
+
+function populateLatticeDropdown(sysKey, selectEl){
+  selectEl.innerHTML='';
+  latticesForSystem(sysKey).forEach(l=>{
+    const opt = document.createElement('option');
+    opt.value=l.id; opt.textContent = l.label + ' — ' + l.abbr;
+    selectEl.appendChild(opt);
+  });
+}
+
+selSystem.value = state.system;
+populateLatticeDropdown(state.system, selLattice);
+selLattice.value = state.latticeId;
+
+selSystem.addEventListener('change', ()=>{
+  state.system = selSystem.value;
+  populateLatticeDropdown(state.system, selLattice);
+  state.latticeId = latticesForSystem(state.system)[0].id;
+  selLattice.value = state.latticeId;
+  loadLatticeDefaults();
+});
+
+selLattice.addEventListener('change', ()=>{
+  state.latticeId = selLattice.value;
+  loadLatticeDefaults();
+});
+
+function loadLatticeDefaults(){
+  const lat = currentLattice();
+  state.params = {...lat.def};
+  applyConstraints();
+  renderMain();
+}
+
+['a','b','c','alpha','beta','gamma'].forEach(k=>{
+  const slider = document.getElementById('slider-'+k);
+  slider.addEventListener('input', ()=>{
+    state.params[k] = parseFloat(slider.value);
+    renderMain();
+  });
+});
+
+document.getElementById('selDisplayMode').addEventListener('change', e=>{
+  state.displayMode = e.target.value;
+  renderMain();
+});
+
+const showKeys = {chkAxes:'axes', chkVectors:'vectors', chkAtomLabels:'atomLabels', chkCell:'cell', chkBonds:'bonds', chkCoords:'coords', chkPlane:'plane'};
+Object.keys(showKeys).forEach(id=>{
+  document.getElementById(id).addEventListener('change', e=>{
+    state.show[showKeys[id]] = e.target.checked;
+    if(showKeys[id]==='plane'){
+      document.getElementById('millerSection').style.display = e.target.checked? 'block':'none';
+      state.miller.active = e.target.checked;
+    }
+    renderMain();
+  });
+});
+
+document.getElementById('btnShowPlane').addEventListener('click', ()=>{
+  const h = parseInt(document.getElementById('millerH').value)||0;
+  const k = parseInt(document.getElementById('millerK').value)||0;
+  const l = parseInt(document.getElementById('millerL').value)||0;
+  if(h===0&&k===0&&l===0){
+    showToast('Indeks (000) tidak valid.');
+    return;
+  }
+  const zeros = [h,k,l].filter(v=>v===0).length;
+  if(zeros>2){
+    showToast('Minimal satu indeks harus bukan nol.');
+    return;
+  }
+  state.miller = {h,k,l,active:true};
+  state.show.plane = true;
+  document.getElementById('chkPlane').checked = true;
+  renderMain();
+  showToast(`Menampilkan bidang (${h}${k}${l})`);
+});
+
+document.getElementById('explodeSlider').addEventListener('input', e=>{
+  state.explode = parseFloat(e.target.value);
+  document.getElementById('explodeVal').textContent = state.explode + '%';
+  renderMain();
+});
+document.getElementById('btnExplodeNormal').addEventListener('click', ()=>{
+  state.explode=0; document.getElementById('explodeSlider').value=0; document.getElementById('explodeVal').textContent='0%'; renderMain();
+});
+document.getElementById('btnExplodeMax').addEventListener('click', ()=>{
+  state.explode=70; document.getElementById('explodeSlider').value=70; document.getElementById('explodeVal').textContent='70%'; renderMain();
+});
+
+document.getElementById('viewIso').addEventListener('click', ()=>mainEngine.setView('iso'));
+document.getElementById('viewTop').addEventListener('click', ()=>mainEngine.setView('top'));
+document.getElementById('viewFront').addEventListener('click', ()=>mainEngine.setView('front'));
+document.getElementById('viewSide').addEventListener('click', ()=>mainEngine.setView('side'));
+document.getElementById('viewResetCam').addEventListener('click', ()=>mainEngine.setView('iso'));
+
+document.getElementById('btnCalcToggle').addEventListener('click', (e)=>{
+  const el = document.getElementById('calcSteps');
+  el.classList.toggle('open');
+  e.target.textContent = el.classList.contains('open') ? '▼ Sembunyikan Perhitungan' : '▶ Tampilkan Perhitungan Atom Efektif';
+});
+
+/* ---- Animation (play) ---- */
+let animRunning = false;
+document.getElementById('btnPlayAnim').addEventListener('click', ()=>{
+  if(animRunning) return;
+  animRunning = true;
+  const btn = document.getElementById('btnPlayAnim');
+  btn.textContent = '⏸ Playing...';
+  const originalA = state.params.a;
+  let t = 0;
+  const dur = 1800;
+  const start = performance.now();
+  function step(now){
+    t = Math.min(1, (now-start)/dur);
+    const ease = t<0.5? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+    const pulse = 1 + 0.35*Math.sin(ease*Math.PI*2);
+    state.params.a = originalA * (1 + 0.25*Math.sin(ease*Math.PI));
+    document.getElementById('explodeSlider').value = Math.round(60*Math.sin(ease*Math.PI));
+    state.explode = 60*Math.sin(ease*Math.PI);
+    document.getElementById('explodeVal').textContent = Math.round(state.explode)+'%';
+    renderMain();
+    if(t<1) requestAnimationFrame(step);
+    else {
+      state.params.a = originalA; state.explode=0;
+      document.getElementById('explodeSlider').value=0;
+      document.getElementById('explodeVal').textContent='0%';
+      renderMain();
+      animRunning=false;
+      btn.textContent='▶ Animate';
+    }
+  }
+  requestAnimationFrame(step);
+});
+
+/* ---- Reset ---- */
+document.getElementById('btnReset').addEventListener('click', resetSimulation);
+function resetSimulation(){
+  state.system = DEFAULT_STATE.system;
+  state.latticeId = DEFAULT_STATE.latticeId;
+  state.params = {...DEFAULT_STATE.params};
+  state.explode = 0;
+  state.displayMode = 'ballstick';
+  state.show = {...DEFAULT_STATE.show};
+  state.miller = {...DEFAULT_STATE.miller};
+
+  selSystem.value = state.system;
+  populateLatticeDropdown(state.system, selLattice);
+  selLattice.value = state.latticeId;
+  document.getElementById('selDisplayMode').value='ballstick';
+  Object.keys(showKeys).forEach(id=>{ document.getElementById(id).checked = state.show[showKeys[id]]; });
+  document.getElementById('millerSection').style.display='none';
+  document.getElementById('explodeSlider').value=0;
+  document.getElementById('explodeVal').textContent='0%';
+
+  mainEngine.setView('iso');
+  renderMain();
+  showToast('Simulasi direset ke pengaturan awal.');
+}
+
+/* ---- Fullscreen ---- */
+document.getElementById('btnFullscreen').addEventListener('click', ()=>{
+  const el = document.getElementById('viewport-container');
+  if(!document.fullscreenElement){
+    el.requestFullscreen ? el.requestFullscreen() : el.webkitRequestFullscreen && el.webkitRequestFullscreen();
+  } else {
+    document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen && document.webkitExitFullscreen();
+  }
+});
+document.addEventListener('fullscreenchange', ()=> setTimeout(()=>mainEngine.resize(), 150));
+
+/* ---- Screenshot ---- */
+document.getElementById('btnScreenshot').addEventListener('click', ()=>{
+  mainEngine.renderer.render(mainEngine.scene, mainEngine.camera);
+  const dataURL = mainEngine.renderer.domElement.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = dataURL;
+  a.download = `crystalsim_${state.latticeId}_${Date.now()}.png`;
+  a.click();
+  showToast('Screenshot disimpan.');
+});
+
+/* ---- Export Data ---- */
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const lat = currentLattice();
+  const calc = lastCalc || computeAll(state.params, lat);
+  const data = {
+    developer:{name:'Ainuzzaim Azzaki', nim:'240321601033', prodi:'Pendidikan Fisika'},
+    system: CRYSTAL_SYSTEMS[lat.system].name,
+    lattice: lat.label,
+    parameters: state.params,
+    results:{
+      effectiveAtoms: calc.nEff,
+      volume_A3: calc.V,
+      ratio_ba: state.params.b/state.params.a,
+      ratio_ca: state.params.c/state.params.a,
+      nearestNeighborDistance_A: calc.dmin,
+      coordinationNumber: calc.cn,
+      atomicPackingFactor: calc.apf,
+      packingEfficiencyPercent: calc.apf*100,
+      cornerPoints: calc.cornerCount,
+      facePoints: calc.faceCount,
+      bodyPoints: calc.bodyCount,
+      basePoints: calc.baseCount
+    },
+    exportedAt: new Date().toISOString()
+  };
+  const json = JSON.stringify(data, null, 2);
+  downloadBlob(json, `crystalsim_${lat.id}.json`, 'application/json');
+
+  const csvRows = [
+    ['Field','Value'],
+    ['Sistem', data.system],
+    ['Kisi', data.lattice],
+    ['a (A)', data.parameters.a],['b (A)', data.parameters.b],['c (A)', data.parameters.c],
+    ['alpha (deg)', data.parameters.alpha],['beta (deg)', data.parameters.beta],['gamma (deg)', data.parameters.gamma],
+    ['Atom Efektif', data.results.effectiveAtoms],
+    ['Volume (A3)', data.results.volume_A3],
+    ['Rasio b/a', data.results.ratio_ba],
+    ['Rasio c/a', data.results.ratio_ca],
+    ['CN', data.results.coordinationNumber],
+    ['APF', data.results.atomicPackingFactor],
+    ['Packing Efficiency (%)', data.results.packingEfficiencyPercent]
+  ];
+  const csv = csvRows.map(r=>r.join(',')).join('\n');
+  downloadBlob(csv, `crystalsim_${lat.id}.csv`, 'text/csv');
+  showToast('Data diekspor (JSON & CSV).');
+});
+
+function downloadBlob(content, filename, type){
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* ---- Modals generic open/close ---- */
+document.querySelectorAll('[data-close]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.getElementById(btn.dataset.close).classList.remove('open');
+  });
+});
+document.querySelectorAll('.modal-backdrop').forEach(bd=>{
+  bd.addEventListener('click', e=>{ if(e.target===bd) bd.classList.remove('open'); });
+});
+document.getElementById('btnHelp').addEventListener('click', ()=>document.getElementById('modalAbout').classList.add('open'));
+
+/* ---- Sidebar toggles (mobile) ---- */
+document.getElementById('btnSidebarToggle').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('info-panel').classList.remove('open');
+});
+document.getElementById('btnInfoToggle').addEventListener('click', ()=>{
+  document.getElementById('info-panel').classList.toggle('open');
+  document.getElementById('sidebar').classList.remove('open');
+});
+
+/* ---------------------------------------------------------------------------------------
+   7. COMPARE MODE
+--------------------------------------------------------------------------------------- */
+
+const cmpSelectA = document.getElementById('cmpSelectA');
+const cmpSelectB = document.getElementById('cmpSelectB');
+BRAVAIS_LATTICES.forEach(l=>{
+  const o1 = document.createElement('option'); o1.value=l.id; o1.textContent=l.label;
+  cmpSelectA.appendChild(o1);
+  const o2 = document.createElement('option'); o2.value=l.id; o2.textContent=l.label;
+  cmpSelectB.appendChild(o2);
+});
+cmpSelectA.value='cubic-F';
+cmpSelectB.value='cubic-I';
+
+let cmpEngineA=null, cmpEngineB=null;
+
+document.getElementById('btnCompare').addEventListener('click', ()=>{
+  document.getElementById('modalCompare').classList.add('open');
+  requestAnimationFrame(()=>{
+    if(!cmpEngineA) cmpEngineA = createEngine(document.getElementById('cmpCanvasA'), {noLabels:true});
+    if(!cmpEngineB) cmpEngineB = createEngine(document.getElementById('cmpCanvasB'), {noLabels:true});
+    cmpEngineA.setView('iso'); cmpEngineB.setView('iso');
+    cmpEngineA.resize(); cmpEngineB.resize();
+    updateCompare();
+  });
+});
+
+function updateCompare(){
+  const latA = getLattice(cmpSelectA.value);
+  const latB = getLattice(cmpSelectB.value);
+  const calcA = buildScene(cmpEngineA, latA.def, latA, {show:{axes:false,vectors:true,atomLabels:false,cell:true,bonds:true,coords:false,plane:false}, explode:0, displayMode:'ballstick', miller:{active:false}});
+  const calcB = buildScene(cmpEngineB, latB.def, latB, {show:{axes:false,vectors:true,atomLabels:false,cell:true,bonds:true,coords:false,plane:false}, explode:0, displayMode:'ballstick', miller:{active:false}});
+
+  const rows = [
+    ['Sistem Kristal', CRYSTAL_SYSTEMS[latA.system].name, CRYSTAL_SYSTEMS[latB.system].name],
+    ['Jenis Kisi', latA.abbr, latB.abbr],
+    ['a,b,c default (Å)', `${latA.def.a}, ${latA.def.b}, ${latA.def.c}`, `${latB.def.a}, ${latB.def.b}, ${latB.def.c}`],
+    ['α,β,γ default (°)', `${latA.def.alpha}, ${latA.def.beta}, ${latA.def.gamma}`, `${latB.def.alpha}, ${latB.def.beta}, ${latB.def.gamma}`],
+    ['Atom Efektif', fmt(calcA.nEff,0), fmt(calcB.nEff,0)],
+    ['Coordination Number', calcA.cn, calcB.cn],
+    ['Volume (Å³)', fmt(calcA.V,3), fmt(calcB.V,3)],
+    ['APF', fmt(calcA.apf,4), fmt(calcB.apf,4)],
+    ['Packing Efficiency', fmt(calcA.apf*100,2)+'%', fmt(calcB.apf*100,2)+'%']
+  ];
+  const table = document.getElementById('cmpTable');
+  table.innerHTML = '<tr><th>Parameter</th><th>'+latA.abbr+'</th><th>'+latB.abbr+'</th></tr>' +
+    rows.map(r=>`<tr><td class="label">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+}
+cmpSelectA.addEventListener('change', updateCompare);
+cmpSelectB.addEventListener('change', updateCompare);
+
+/* ---------------------------------------------------------------------------------------
+   8. CUSTOM CRYSTAL MODE
+--------------------------------------------------------------------------------------- */
+
+document.getElementById('btnCustom').addEventListener('click', ()=>{
+  document.getElementById('modalCustom').classList.add('open');
+});
+
+function classifySystem(a,b,c,alpha,beta,gamma){
+  const eps = 0.02, epsA = 0.3;
+  const eq = (x,y)=>Math.abs(x-y)<eps*Math.max(x,y,1);
+  const eqA = (x,y)=>Math.abs(x-y)<epsA;
+  const is90 = x=>eqA(x,90);
+  const abcAllEq = eq(a,b)&&eq(b,c);
+  const abcNoneEq = !eq(a,b)&&!eq(b,c)&&!eq(a,c);
+  const angAll90 = is90(alpha)&&is90(beta)&&is90(gamma);
+  const angAllEq = eqA(alpha,beta)&&eqA(beta,gamma);
+
+  if(abcAllEq && angAll90) return 'cubic';
+  if(eq(a,b) && !eq(b,c) && angAll90) return 'tetragonal';
+  if(abcNoneEq && angAll90) return 'orthorhombic';
+  if(abcNoneEq && is90(alpha) && is90(gamma) && !is90(beta)) return 'monoclinic';
+  if(abcAllEq && angAllEq && !is90(alpha)) return 'rhombohedral';
+  if(eq(a,b) && !eq(b,c) && is90(alpha) && is90(beta) && eqA(gamma,120)) return 'hexagonal';
+  if(abcNoneEq && !is90(alpha) && !is90(beta) && !is90(gamma) && !eqA(alpha,beta) ) return 'triclinic';
+  return 'triclinic'; // fallback: freest system for anything unmatched
+}
+
+let customAnalyzed = null;
+document.getElementById('btnAnalyzeCustom').addEventListener('click', ()=>{
+  const a=parseFloat(document.getElementById('custA').value);
+  const b=parseFloat(document.getElementById('custB').value);
+  const c=parseFloat(document.getElementById('custC').value);
+  const alpha=parseFloat(document.getElementById('custAlpha').value);
+  const beta=parseFloat(document.getElementById('custBeta').value);
+  const gamma=parseFloat(document.getElementById('custGamma').value);
+  const banner = document.getElementById('custResult');
+
+  if([a,b,c].some(v=>!(v>0)) || [alpha,beta,gamma].some(v=>!(v>0 && v<180))){
+    banner.className='result-banner warn';
+    banner.textContent='⚠ Parameter tidak valid: panjang harus > 0 dan sudut harus di antara 0°–180°.';
+    document.getElementById('btnLoadCustom').disabled = true;
+    return;
+  }
+  const inner = 1 - Math.pow(Math.cos(alpha*D2R),2) - Math.pow(Math.cos(beta*D2R),2) - Math.pow(Math.cos(gamma*D2R),2) + 2*Math.cos(alpha*D2R)*Math.cos(beta*D2R)*Math.cos(gamma*D2R);
+  const sys = classifySystem(a,b,c,alpha,beta,gamma);
+  const sysInfo = CRYSTAL_SYSTEMS[sys];
+  if(inner<=0){
+    banner.className='result-banner warn';
+    banner.textContent = `⚠ Kombinasi sudut ini tidak membentuk sel satuan yang valid secara geometris (volume tak-real). Coba sudut yang lebih moderat.`;
+    document.getElementById('btnLoadCustom').disabled = true;
+    return;
+  }
+  banner.className='result-banner ok';
+  banner.innerHTML = `✓ Parameter sesuai karakteristik sistem <b>${sysInfo.name.toUpperCase()}</b><br>Hubungan terdeteksi: ${sysInfo.relAbc}, ${sysInfo.relAngle}`;
+  customAnalyzed = {a,b,c,alpha,beta,gamma,sys};
+  document.getElementById('btnLoadCustom').disabled = false;
+});
+
+document.getElementById('btnLoadCustom').addEventListener('click', ()=>{
+  if(!customAnalyzed) return;
+  state.system = 'triclinic';
+  state.latticeId = 'triclinic-P';
+  state.params = {a:customAnalyzed.a,b:customAnalyzed.b,c:customAnalyzed.c,alpha:customAnalyzed.alpha,beta:customAnalyzed.beta,gamma:customAnalyzed.gamma};
+  selSystem.value='triclinic';
+  populateLatticeDropdown('triclinic', selLattice);
+  selLattice.value='triclinic-P';
+  renderMain();
+  document.getElementById('modalCustom').classList.remove('open');
+  showToast('Parameter custom dimuat ke simulasi utama (mode bebas / triclinic engine).');
+});
+
+/* ---------------------------------------------------------------------------------------
+   9. QUIZ MODE
+--------------------------------------------------------------------------------------- */
+
+function buildQuizBank(){
+  const bank = [];
+  // System identification from a,b,c / angle relations
+  const relSets = [
+    {a:'a = b = c', ang:'α = β = γ = 90°', ans:'cubic'},
+    {a:'a = b ≠ c', ang:'α = β = γ = 90°', ans:'tetragonal'},
+    {a:'a ≠ b ≠ c', ang:'α = β = γ = 90°', ans:'orthorhombic'},
+    {a:'a ≠ b ≠ c', ang:'α = γ = 90°, β ≠ 90°', ans:'monoclinic'},
+    {a:'a ≠ b ≠ c', ang:'α ≠ β ≠ γ ≠ 90°', ans:'triclinic'},
+    {a:'a = b = c', ang:'α = β = γ ≠ 90°', ans:'rhombohedral'},
+    {a:'a = b ≠ c', ang:'α = β = 90°, γ = 120°', ans:'hexagonal'}
+  ];
+  relSets.forEach(r=>{
+    const opts = Object.keys(CRYSTAL_SYSTEMS);
+    bank.push({
+      q:`Suatu unit cell memiliki:\n${r.a}\n${r.ang}\n\nSistem kristalnya adalah?`,
+      options: opts, correct:r.ans,
+      explain:`Ciri ${r.a} dan ${r.ang} adalah karakteristik unik sistem ${CRYSTAL_SYSTEMS[r.ans].name}.`
+    });
+  });
+  // Effective atom count questions
+  BRAVAIS_LATTICES.forEach(l=>{
+    const n = effectiveAtoms(l.centering);
+    bank.push({
+      q:`Berapa jumlah atom efektif per unit cell pada struktur ${l.label} (${l.abbr})?`,
+      options:[String(n), String(n+1<=8?n+1:n-1), String(Math.max(1,n-1)), String(n*2)],
+      correct:String(n),
+      explain:`${l.label} memiliki centering "${l.centering}" sehingga kontribusi atomnya menghasilkan total ${n} atom efektif per unit cell.`,
+      shuffle:true
+    });
+  });
+  // APF / CN for cubic (well known, pedagogically standard)
+  const cubicFacts = [
+    {id:'cubic-P', cn:6, apf:'0.52'},
+    {id:'cubic-I', cn:8, apf:'0.68'},
+    {id:'cubic-F', cn:12, apf:'0.74'}
+  ];
+  cubicFacts.forEach(f=>{
+    const lat = getLattice(f.id);
+    bank.push({
+      q:`Berapa Coordination Number (CN) untuk struktur ${lat.label}?`,
+      options:['4','6','8','12'], correct:String(f.cn),
+      explain:`${lat.label} memiliki CN = ${f.cn}, dihitung dari jumlah titik kisi tetangga terdekat pada jarak minimum.`
+    });
+  });
+  return bank;
+}
+const QUIZ_BANK = buildQuizBank();
+let quizState = {score:0, total:0, current:null, pool:[]};
+
+document.getElementById('btnQuiz').addEventListener('click', ()=>{
+  document.getElementById('modalQuiz').classList.add('open');
+  if(quizState.pool.length===0) resetQuizPool();
+  nextQuizQuestion();
+});
+document.getElementById('btnNextQuiz').addEventListener('click', nextQuizQuestion);
+
+function resetQuizPool(){
+  quizState.pool = [...QUIZ_BANK].sort(()=>Math.random()-0.5);
+}
+function shuffleArr(arr){ return [...arr].sort(()=>Math.random()-0.5); }
+
+function nextQuizQuestion(){
+  if(quizState.pool.length===0) resetQuizPool();
+  const q = quizState.pool.pop();
+  quizState.current = q;
+  document.getElementById('quizExplain').classList.remove('show');
+  document.getElementById('quizQuestion').innerHTML = `<pre>${q.q}</pre>`;
+
+  let optionLabels;
+  if(q.options[0] in CRYSTAL_SYSTEMS){
+    optionLabels = q.options.map(k=>({key:k, label:CRYSTAL_SYSTEMS[k].name}));
+  } else {
+    optionLabels = q.options.map(k=>({key:k, label:k}));
+  }
+  optionLabels = shuffleArr(optionLabels);
+
+  const optsDiv = document.getElementById('quizOpts');
+  optsDiv.innerHTML='';
+  optionLabels.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className='quiz-opt';
+    btn.textContent = opt.label;
+    btn.addEventListener('click', ()=>answerQuiz(opt.key, btn));
+    optsDiv.appendChild(btn);
+  });
+  updateQuizScoreLabel();
+}
+
+function answerQuiz(key, btn){
+  const q = quizState.current;
+  const correct = String(key)===String(q.correct);
+  quizState.total++;
+  if(correct) quizState.score++;
+  document.querySelectorAll('.quiz-opt').forEach(b=>{
+    b.disabled = true;
+    const isThisCorrect = (b===btn);
+    if(isThisCorrect) b.classList.add(correct?'correct':'wrong');
+  });
+  const explainDiv = document.getElementById('quizExplain');
+  explainDiv.textContent = (correct? '✓ Benar! ' : '✗ Kurang tepat. ') + q.explain;
+  explainDiv.classList.add('show');
+  updateQuizScoreLabel();
+}
+function updateQuizScoreLabel(){
+  document.getElementById('quizScore').textContent = `Skor: ${quizState.score} / ${quizState.total}`;
+}
+
+/* ---------------------------------------------------------------------------------------
+   10. BOOT
+--------------------------------------------------------------------------------------- */
+loadLatticeDefaults();
+renderMain();
+
+})();
+</script>
+</body>
+</html>
